@@ -14,6 +14,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using Ozeki.Media.IPCamera;
 using Ozeki.Media.MediaHandlers;
+using Ozeki.Media.MJPEGStreaming;
 using Ozeki.Media.MediaHandlers.Video;
 using Ozeki.Media.Video.Controls;
 
@@ -33,6 +34,11 @@ namespace Thermal_Cam
         private WebCamera _webCamera;
 
         private MediaConnector _connector;
+        
+        private MJPEGStreamer _streamer;
+
+        private _IVideoSender _videoSender;
+        
         public MainWindow()
         {
             InitializeComponent();
@@ -62,8 +68,10 @@ namespace Thermal_Cam
             _webcamera = WebCamera.GetDefaultDevice();
             if (_webCamera == null) 
                 return;
+         
             _connector.Connect(_webCamera, _provider);
-
+            _videoSender = _webCamera;
+            
             _webCamera.Start();
             _videoViewerWpf.Start();
         }
@@ -90,8 +98,10 @@ namespace Thermal_Cam
             _ipCamera = IPCameraFactory.GetCamera(host, user, pass);
             if (_ipCamera == null)
                 return;
+                
             _connector.Connect(_ipCamera.VideoChannel, _provider);
-
+            _videoSender = _ipCamera.VideoChannel;
+            
             _ipCamera.Start();
             _videoViewerWpf.Start();
         }
@@ -105,5 +115,37 @@ namespace Thermal_Cam
             _connector.Disconnect(_ipCamera.VideoChannel, _provider);
         }
         #endregion
+        
+         private void Start_Streaming_Click(object sender, RoutedEventArgs e)
+            {
+                var ip = ipAddressText.Text;
+                var port = PortText.Text;
+
+                _streamer = new MJPEGStreamer(ip, int.Parse(port));
+
+                _connector.Connect(_videoSender, _streamer.VideoChannel);
+
+                _streamer.ClientConnected += streamer.ClientConnected;
+                _streamer.ClientDisconnected += streamer.ClientDisconnected;
+
+                _streamer.Start;
+            
+            }
+
+            void streamer_ClientConnected(object sender, Ozeki.VOIPEventArgs<IMPJEGStreamClient> e)
+            {
+                e.Item.StartStreaming();
+            }
+
+            void streamer_ClientDisconnected(object sender, Ozeki.VOIP.VOIPEventArgs<IMJPEGStreamClient> e)
+            {
+                e.Item.StopStreaming();
+            }
+
+            private void Stop_Streaming_Click(object sender, RoutedEventsArgs e)
+            {
+                _streamer.Stop();
+                _connectror.Disconnect(_videoSender, _streamer.VideoChannel);
+            }
     }
 }
